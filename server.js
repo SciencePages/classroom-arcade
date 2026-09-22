@@ -74,7 +74,7 @@ try {
     }
   }
 } catch (err) {
-  console.log("Using default question bank.");
+  console.log("Using embedded default question bank.");
 }
 
 const rooms = {};
@@ -86,6 +86,7 @@ function generatePin() {
 io.on('connection', (socket) => {
   socket.on('create-room', () => {
     const pin = generatePin();
+    socket.roomPin = pin;
     rooms[pin] = { hostId: socket.id, players: {}, state: 'lobby' };
     socket.join(pin);
     socket.emit('room-created', pin);
@@ -94,6 +95,7 @@ io.on('connection', (socket) => {
   socket.on('join-room', ({ pin, nickname }) => {
     const cleanPin = pin ? pin.toString().trim() : '';
     if (rooms[cleanPin]) {
+      socket.roomPin = cleanPin;
       rooms[cleanPin].players[socket.id] = { nickname, gold: 0 };
       socket.join(cleanPin);
       socket.emit('joined-successfully');
@@ -104,29 +106,29 @@ io.on('connection', (socket) => {
   });
 
   socket.on('start-game', ({ pin }) => {
-    const cleanPin = pin ? pin.toString().trim() : '';
-    if (rooms[cleanPin] && rooms[cleanPin].hostId === socket.id) {
+    const cleanPin = (pin || socket.roomPin || '').toString().trim();
+    if (rooms[cleanPin]) {
+      rooms[cleanPin].hostId = socket.id;
       rooms[cleanPin].state = 'playing';
       io.to(cleanPin).emit('game-started');
     }
   });
 
-  socket.on('request-question', ({ pin }) => {
-    const cleanPin = pin ? pin.toString().trim() : '';
-    if (rooms[cleanPin] && rooms[cleanPin].state === 'playing' && questions.length > 0) {
+  socket.on('request-question', () => {
+    if (questions.length > 0) {
       const q = questions[Math.floor(Math.random() * questions.length)];
       socket.emit('receive-question', q);
     }
   });
 
-  socket.on('submit-answer', ({ pin, isCorrect }) => {
+  socket.on('submit-answer', ({ isCorrect }) => {
     socket.emit('answer-result', { isCorrect });
   });
 
-  socket.on('open-chest', ({ pin, chestIndex }) => {
-    const cleanPin = pin ? pin.toString().trim() : '';
-    const room = rooms[cleanPin];
-    if (!room || room.state !== 'playing') return;
+  socket.on('open-chest', ({ chestIndex }) => {
+    const pin = socket.roomPin;
+    const room = rooms[pin];
+    if (!room) return;
 
     const player = room.players[socket.id];
     if (!player) return;
@@ -137,7 +139,20 @@ io.on('connection', (socket) => {
 
     const otherPlayerIds = Object.keys(room.players).filter(id => id !== socket.id);
 
-    if (outcome === 'gold_small') {
+    if (outcome === 'steal') {
+      if (otherPlayerIds.length > 0) {
+        const targets = otherPlayerIds.map(id => ({
+          id,
+          nickname: room.players[id].nickname,
+          gold: room.players[id].gold
+        }));
+        socket.emit('prompt-steal', { targets });
+        return; // Pause until player selects a target
+      } else {
+        player.gold += 100;
+        resultMsg = "+100 Gold!";
+      }
+    } else if (outcome === 'gold_small') {
       player.gold += 50;
       resultMsg = "+50 Gold!";
     } else if (outcome === 'gold_med') {
@@ -146,20 +161,6 @@ io.on('connection', (socket) => {
     } else if (outcome === 'gold_large') {
       player.gold += 300;
       resultMsg = "+300 Gold!";
-    } else if (outcome === 'steal') {
-      if (otherPlayerIds.length > 0) {
-        let targetId = otherPlayerIds.reduce((maxId, id) => 
-          room.players[id].gold > room.players[maxId].gold ? id : maxId, otherPlayerIds[0]);
-        let stolenAmount = Math.floor(room.players[targetId].gold * 0.25);
-        if (stolenAmount === 0) stolenAmount = 50;
-        
-        room.players[targetId].gold = Math.max(0, room.players[targetId].gold - stolenAmount);
-        player.gold += stolenAmount;
-        resultMsg = `Stole ${stolenAmount} Gold from ${room.players[targetId].nickname}!`;
-      } else {
-        player.gold += 100;
-        resultMsg = "+100 Gold!";
-      }
     } else if (outcome === 'swap') {
       if (otherPlayerIds.length > 0) {
         let randomTargetId = otherPlayerIds[Math.floor(Math.random() * otherPlayerIds.length)];
@@ -176,6 +177,29 @@ io.on('connection', (socket) => {
       player.gold -= lost;
       resultMsg = `Lose 25% Gold (-${lost})!`;
     }
+
+    socket.emit('chest-opened', { resultMsg, totalGold: player.gold });
+    io.to(room.hostId).emit('update-players', room.players);
+  });
+
+  socket.on('execute-steal', ({ targetId }) => {
+    const pin = socket.roomPin;
+    const room = rooms[pin];
+    if (!room) return;
+
+    const player = room.players[socket.id];
+    const target = room.players[targetId];
+
+    if (!player || !target) return;
+
+    let stolenAmount = Math.floor(target.gold * 0.25);
+    if (stolenAmount === 0 && target.gold > 0) stolenAmount = target.gold;
+    if (stolenAmount === 0) stolenAmount = 50;
+
+    target.gold = Math.max(0, target.gold - stolenAmount);
+    player.gold += stolenAmount;
+
+    const resultMsg = `Stole ${stolenAmount} Gold from ${target.nickname}!`;
 
     socket.emit('chest-opened', { resultMsg, totalGold: player.gold });
     io.to(room.hostId).emit('update-players', room.players);
