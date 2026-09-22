@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Classroom Arcade - Play</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="card" id="join-card">
+    <h1>Join Game</h1>
+    <input type="text" id="game-code" placeholder="6-Digit PIN" maxlength="6">
+    <input type="text" id="nickname" placeholder="Nickname">
+    <button onclick="joinGame()">Enter Game</button>
+    <p id="error-msg" style="color:red; margin-top:0.5rem;"></p>
+  </div>
+
+  <div class="card hidden" id="waiting-card">
+    <h2>You're in!</h2>
+    <p>Look at the main screen until the host starts.</p>
+  </div>
+
+  <div class="card hidden" id="question-card">
+    <div style="font-weight:bold; margin-bottom: 0.5rem;" id="score-display">Gold: 0</div>
+    <h2 id="question-text">Question goes here</h2>
+    <div class="options-grid" id="options-container"></div>
+  </div>
+
+  <div class="card hidden" id="chest-card">
+    <h2>Choose a Mystery Chest!</h2>
+    <div class="chest-grid">
+      <button class="chest-btn" onclick="pickChest(0)">📦</button>
+      <button class="chest-btn" onclick="pickChest(1)">📦</button>
+      <button class="chest-btn" onclick="pickChest(2)">📦</button>
+    </div>
+  </div>
+
+  <div class="card hidden" id="feedback-card">
+    <h2 id="feedback-title">Outcome</h2>
+    <p id="feedback-detail"></p>
+    <button style="margin-top:1rem;" onclick="nextQuestion()">Next Question</button>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="client.js"></script>
+</body>
+</html>
