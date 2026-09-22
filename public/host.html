@@ -2,28 +2,62 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Classroom Arcade - Host View</title>
+  <title>Classroom Arcade - Host</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="card" id="host-lobby">
+  <div class="container" style="max-width: 600px;">
     <h1>Host Dashboard</h1>
-    <button id="create-btn" onclick="createGame()">Create Game Room</button>
-    <div id="lobby-info" class="hidden">
-      <p>Join Code:</p>
-      <h2 id="display-code" style="font-size:2.5rem; color:#2563eb;">------</h2>
-      <h3>Joined Players:</h3>
-      <ul id="player-list"></ul>
-      <button onclick="startGame()">Start Game</button>
+    <button onclick="createRoom()" style="background: #6200ee; font-size: 18px;">Create Game Room</button>
+    
+    <div style="margin: 20px 0;">
+      <h2>Join Code:</h2>
+      <h1 id="game-pin" style="font-size: 52px; color: #52b788; letter-spacing: 6px; margin: 10px 0;">------</h1>
+    </div>
+
+    <h2 style="border-bottom: 2px solid #3d405b; padding-bottom: 10px;">Live Leaderboard</h2>
+    <div id="player-list" style="text-align: left; margin-top: 15px;">
+      <p style="color: #888; text-align: center;">No players joined yet...</p>
     </div>
   </div>
 
-  <div class="card hidden" id="host-scoreboard">
-    <h2>Live Leaderboard</h2>
-    <ul id="leaderboard"></ul>
-  </div>
-
   <script src="/socket.io/socket.io.js"></script>
-  <script src="client.js"></script>
+  <script>
+    const socket = io();
+
+    function createRoom() {
+      socket.emit('create-room');
+    }
+
+    socket.on('room-created', (pin) => {
+      document.getElementById('game-pin').innerText = pin;
+    });
+
+    socket.on('update-players', (players) => {
+      const list = document.getElementById('player-list');
+      list.innerHTML = '';
+      
+      // Sort players by gold descending
+      const sorted = Object.values(players).sort((a, b) => b.gold - a.gold);
+
+      if (sorted.length === 0) {
+        list.innerHTML = '<p style="color: #888; text-align: center;">No players joined yet...</p>';
+        return;
+      }
+
+      sorted.forEach((p, index) => {
+        const item = document.createElement('div');
+        item.style.cssText = 'padding: 12px; margin: 8px 0; background: #2a2a32; border-radius: 6px; display: flex; justify-content: space-between; font-size: 20px; font-weight: bold;';
+        
+        let medal = `#${index + 1}`;
+        if (index === 0) medal = '🥇 1st';
+        if (index === 1) medal = '🥈 2nd';
+        if (index === 2) medal = '🥉 3rd';
+
+        item.innerHTML = `<span>${medal} ${p.nickname}</span> <span style="color: #f4a261;">💰 ${p.gold} Gold</span>`;
+        list.appendChild(item);
+      });
+    });
+  </script>
 </body>
 </html>
