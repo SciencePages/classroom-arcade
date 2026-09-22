@@ -1,20 +1,52 @@
 [
   {
-    "id": 1,
-    "question": "What is the capital of France?",
-    "options": ["London", "Berlin", "Paris", "Madrid"],
-    "answer": 2
+    "question": "What process do plants use to convert sunlight into energy?",
+    "options": ["Photosynthesis", "Respiration", "Fermentation", "Combustion"],
+    "answer": "Photosynthesis"
   },
   {
-    "id": 2,
-    "question": "Which planet is known as the Red Planet?",
-    "options": ["Earth", "Mars", "Jupiter", "Venus"],
-    "answer": 1
+    "question": "Which planet in our solar system is known as the Red Planet?",
+    "options": ["Venus", "Mars", "Jupiter", "Saturn"],
+    "answer": "Mars"
   },
   {
-    "id": 3,
-    "question": "What is 7 multiplied by 8?",
-    "options": ["54", "56", "62", "48"],
-    "answer": 1
+    "question": "What is the hardest naturally occurring substance on Earth?",
+    "options": ["Gold", "Iron", "Diamond", "Quartz"],
+    "answer": "Diamond"
+  },
+  {
+    "question": "What force keeps objects grounded on Earth?",
+    "options": ["Magnetism", "Friction", "Gravity", "Inertia"],
+    "answer": "Gravity"
+  },
+  {
+    "question": "Which gas do humans require to breathe for survival?",
+    "options": ["Carbon Dioxide", "Oxygen", "Nitrogen", "Helium"],
+    "answer": "Oxygen"
+  },
+  {
+    "question": "How many continents are there on Earth?",
+    "options": ["5", "6", "7", "8"],
+    "answer": "7"
+  },
+  {
+    "question": "What state of matter is water vapor?",
+    "options": ["Solid", "Liquid", "Gas", "Plasma"],
+    "answer": "Gas"
+  },
+  {
+    "question": "What organ pumps blood throughout the human body?",
+    "options": ["Brain", "Lungs", "Liver", "Heart"],
+    "answer": "Heart"
+  },
+  {
+    "question": "Which chemical element has the symbol 'O'?",
+    "options": ["Osmium", "Oxygen", "Gold", "Zinc"],
+    "answer": "Oxygen"
+  },
+  {
+    "question": "What is the freezing point of water in Celsius?",
+    "options": ["0°C", "32°C", "100°C", "-10°C"],
+    "answer": "0°C"
   }
 ]
