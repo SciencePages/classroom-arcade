@@ -7,12 +7,18 @@ function joinGame() {
   if (pin && nickname) {
     currentPin = pin;
     document.getElementById('player-nick').innerText = nickname;
-    socket.emit('join-room', { pin, nickname });
+    socket.emit('join-room', { pin: currentPin, nickname });
   }
 }
 
 socket.on('joined-successfully', () => {
   document.getElementById('join-screen').style.display = 'none';
+  document.getElementById('waiting-screen').style.display = 'block';
+  document.getElementById('game-screen').style.display = 'none';
+});
+
+socket.on('game-started', () => {
+  document.getElementById('waiting-screen').style.display = 'none';
   document.getElementById('game-screen').style.display = 'block';
   loadNextQuestion();
 });
@@ -64,7 +70,6 @@ socket.on('chest-opened', ({ resultMsg, totalGold }) => {
   const resultBox = document.getElementById('chest-result');
   resultBox.innerText = resultMsg;
 
-  // Apply high-contrast banner styles based on outcome
   if (resultMsg.includes('Stole') || resultMsg.includes('Swapped')) {
     resultBox.className = 'outcome-banner banner-steal';
   } else if (resultMsg.includes('Lose')) {
