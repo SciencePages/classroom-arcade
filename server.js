@@ -10,7 +10,7 @@ const io = new Server(server);
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-// 10 Embedded Questions (Ensures immediate, fault-tolerant loading)
+// 10 Embedded Questions
 let questions = [
   {
     question: "What process do plants use to convert sunlight into energy?",
@@ -64,7 +64,6 @@ let questions = [
   }
 ];
 
-// Load questions.json if present
 try {
   const qPath = path.join(__dirname, 'questions.json');
   if (fs.existsSync(qPath)) {
@@ -87,7 +86,7 @@ function generatePin() {
 io.on('connection', (socket) => {
   socket.on('create-room', () => {
     const pin = generatePin();
-    rooms[pin] = { hostId: socket.id, players: {} };
+    rooms[pin] = { hostId: socket.id, players: {}, state: 'lobby' };
     socket.join(pin);
     socket.emit('room-created', pin);
   });
@@ -106,11 +105,15 @@ io.on('connection', (socket) => {
 
   socket.on('start-game', ({ pin }) => {
     const cleanPin = pin ? pin.toString().trim() : '';
-    io.to(cleanPin).emit('game-started');
+    if (rooms[cleanPin] && rooms[cleanPin].hostId === socket.id) {
+      rooms[cleanPin].state = 'playing';
+      io.to(cleanPin).emit('game-started');
+    }
   });
 
-  socket.on('request-question', () => {
-    if (questions.length > 0) {
+  socket.on('request-question', ({ pin }) => {
+    const cleanPin = pin ? pin.toString().trim() : '';
+    if (rooms[cleanPin] && rooms[cleanPin].state === 'playing' && questions.length > 0) {
       const q = questions[Math.floor(Math.random() * questions.length)];
       socket.emit('receive-question', q);
     }
@@ -123,7 +126,7 @@ io.on('connection', (socket) => {
   socket.on('open-chest', ({ pin, chestIndex }) => {
     const cleanPin = pin ? pin.toString().trim() : '';
     const room = rooms[cleanPin];
-    if (!room) return;
+    if (!room || room.state !== 'playing') return;
 
     const player = room.players[socket.id];
     if (!player) return;
