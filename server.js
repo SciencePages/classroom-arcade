@@ -139,15 +139,16 @@ io.on('connection', (socket) => {
 
     const otherPlayerIds = Object.keys(room.players).filter(id => id !== socket.id);
 
-    if (outcome === 'steal') {
+    // If steal OR swap is drawn and opponents exist, prompt player for target
+    if (outcome === 'steal' || outcome === 'swap') {
       if (otherPlayerIds.length > 0) {
         const targets = otherPlayerIds.map(id => ({
           id,
           nickname: room.players[id].nickname,
           gold: room.players[id].gold
         }));
-        socket.emit('prompt-steal', { targets });
-        return; // Pause until player selects a target
+        socket.emit('prompt-target', { actionType: outcome, targets });
+        return; // Wait for target selection
       } else {
         player.gold += 100;
         resultMsg = "+100 Gold!";
@@ -161,17 +162,6 @@ io.on('connection', (socket) => {
     } else if (outcome === 'gold_large') {
       player.gold += 300;
       resultMsg = "+300 Gold!";
-    } else if (outcome === 'swap') {
-      if (otherPlayerIds.length > 0) {
-        let randomTargetId = otherPlayerIds[Math.floor(Math.random() * otherPlayerIds.length)];
-        let temp = player.gold;
-        player.gold = room.players[randomTargetId].gold;
-        room.players[randomTargetId].gold = temp;
-        resultMsg = `Swapped Gold with ${room.players[randomTargetId].nickname}!`;
-      } else {
-        player.gold += 100;
-        resultMsg = "+100 Gold!";
-      }
     } else if (outcome === 'lose') {
       let lost = Math.floor(player.gold * 0.25);
       player.gold -= lost;
@@ -182,7 +172,7 @@ io.on('connection', (socket) => {
     io.to(room.hostId).emit('update-players', room.players);
   });
 
-  socket.on('execute-steal', ({ targetId }) => {
+  socket.on('execute-target-action', ({ actionType, targetId }) => {
     const pin = socket.roomPin;
     const room = rooms[pin];
     if (!room) return;
@@ -192,14 +182,22 @@ io.on('connection', (socket) => {
 
     if (!player || !target) return;
 
-    let stolenAmount = Math.floor(target.gold * 0.25);
-    if (stolenAmount === 0 && target.gold > 0) stolenAmount = target.gold;
-    if (stolenAmount === 0) stolenAmount = 50;
+    let resultMsg = "";
 
-    target.gold = Math.max(0, target.gold - stolenAmount);
-    player.gold += stolenAmount;
+    if (actionType === 'steal') {
+      let stolenAmount = Math.floor(target.gold * 0.25);
+      if (stolenAmount === 0 && target.gold > 0) stolenAmount = target.gold;
+      if (stolenAmount === 0) stolenAmount = 50;
 
-    const resultMsg = `Stole ${stolenAmount} Gold from ${target.nickname}!`;
+      target.gold = Math.max(0, target.gold - stolenAmount);
+      player.gold += stolenAmount;
+      resultMsg = `Stole ${stolenAmount} Gold from ${target.nickname}!`;
+    } else if (actionType === 'swap') {
+      let temp = player.gold;
+      player.gold = target.gold;
+      target.gold = temp;
+      resultMsg = `Swapped Gold with ${target.nickname}!`;
+    }
 
     socket.emit('chest-opened', { resultMsg, totalGold: player.gold });
     io.to(room.hostId).emit('update-players', room.players);
