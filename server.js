@@ -2,18 +2,41 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const fs = require('fs');
+const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, 'public')));
 
-let questions = [];
+// Default fallback questions in case file loading is interrupted
+let questions = [
+  {
+    question: "What process do plants use to convert sunlight into energy?",
+    options: ["Photosynthesis", "Respiration", "Fermentation", "Combustion"],
+    answer: "Photosynthesis"
+  },
+  {
+    question: "Which planet in our solar system is known as the Red Planet?",
+    options: ["Venus", "Mars", "Jupiter", "Saturn"],
+    answer: "Mars"
+  }
+];
+
+// Load questions.json with absolute path resolution
 try {
-  questions = JSON.parse(fs.readFileSync('questions.json', 'utf8'));
+  const qPath = path.join(__dirname, 'questions.json');
+  if (fs.existsSync(qPath)) {
+    const fileData = fs.readFileSync(qPath, 'utf8');
+    const parsed = JSON.parse(fileData);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      questions = parsed;
+      console.log(`Loaded ${questions.length} questions successfully.`);
+    }
+  }
 } catch (err) {
-  console.error("Error loading questions.json", err);
+  console.error("Error loading questions.json, using fallback bank:", err);
 }
 
 const rooms = {};
@@ -31,25 +54,28 @@ io.on('connection', (socket) => {
   });
 
   socket.on('join-room', ({ pin, nickname }) => {
-    if (rooms[pin]) {
-      rooms[pin].players[socket.id] = { nickname, gold: 0 };
-      socket.join(pin);
+    const cleanPin = pin ? pin.toString().trim() : '';
+    if (rooms[cleanPin]) {
+      rooms[cleanPin].players[socket.id] = { nickname, gold: 0 };
+      socket.join(cleanPin);
       socket.emit('joined-successfully');
-      io.to(rooms[pin].hostId).emit('update-players', rooms[pin].players);
+      io.to(rooms[cleanPin].hostId).emit('update-players', rooms[cleanPin].players);
     } else {
       socket.emit('error-msg', 'Room not found!');
     }
   });
 
   socket.on('start-game', ({ pin }) => {
-    if (rooms[pin] && rooms[pin].hostId === socket.id) {
-      rooms[pin].state = 'playing';
-      io.to(pin).emit('game-started');
+    const cleanPin = pin ? pin.toString().trim() : '';
+    if (rooms[cleanPin] && rooms[cleanPin].hostId === socket.id) {
+      rooms[cleanPin].state = 'playing';
+      io.to(cleanPin).emit('game-started');
     }
   });
 
   socket.on('request-question', ({ pin }) => {
-    if (rooms[pin] && rooms[pin].state === 'playing' && questions.length > 0) {
+    const cleanPin = pin ? pin.toString().trim() : '';
+    if (rooms[cleanPin] && rooms[cleanPin].state === 'playing' && questions.length > 0) {
       const q = questions[Math.floor(Math.random() * questions.length)];
       socket.emit('receive-question', q);
     }
@@ -60,7 +86,8 @@ io.on('connection', (socket) => {
   });
 
   socket.on('open-chest', ({ pin, chestIndex }) => {
-    const room = rooms[pin];
+    const cleanPin = pin ? pin.toString().trim() : '';
+    const room = rooms[cleanPin];
     if (!room || room.state !== 'playing') return;
 
     const player = room.players[socket.id];
