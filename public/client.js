@@ -22,7 +22,9 @@ socket.on('error-msg', (msg) => alert(msg));
 function loadNextQuestion() {
   document.getElementById('chest-overlay').style.display = 'none';
   document.getElementById('question-card').style.display = 'block';
-  document.getElementById('chest-result').innerText = '';
+  const resultBox = document.getElementById('chest-result');
+  resultBox.innerText = '';
+  resultBox.className = '';
   document.getElementById('next-q-btn').style.display = 'none';
   socket.emit('request-question', { pin: currentPin });
 }
@@ -59,6 +61,17 @@ function pickChest(index) {
 
 socket.on('chest-opened', ({ resultMsg, totalGold }) => {
   document.getElementById('gold-count').innerText = totalGold;
-  document.getElementById('chest-result').innerText = resultMsg;
+  const resultBox = document.getElementById('chest-result');
+  resultBox.innerText = resultMsg;
+
+  // Apply high-contrast banner styles based on outcome
+  if (resultMsg.includes('Stole') || resultMsg.includes('Swapped')) {
+    resultBox.className = 'outcome-banner banner-steal';
+  } else if (resultMsg.includes('Lose')) {
+    resultBox.className = 'outcome-banner banner-loss';
+  } else {
+    resultBox.className = 'outcome-banner banner-gain';
+  }
+
   document.getElementById('next-q-btn').style.display = 'inline-block';
 });
