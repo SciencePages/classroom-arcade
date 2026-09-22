@@ -1,0 +1,20 @@
+[
+  {
+    "id": 1,
+    "question": "What is the capital of France?",
+    "options": ["London", "Berlin", "Paris", "Madrid"],
+    "answer": 2
+  },
+  {
+    "id": 2,
+    "question": "Which planet is known as the Red Planet?",
+    "options": ["Earth", "Mars", "Jupiter", "Venus"],
+    "answer": 1
+  },
+  {
+    "id": 3,
+    "question": "What is 7 multiplied by 8?",
+    "options": ["54", "56", "62", "48"],
+    "answer": 1
+  }
+]
