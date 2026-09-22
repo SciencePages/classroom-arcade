@@ -2,112 +2,115 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const fs = require('fs');
-const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static('public'));
 
 let questions = [];
 try {
   questions = JSON.parse(fs.readFileSync('questions.json', 'utf8'));
 } catch (err) {
-  console.error('Error loading questions.json:', err);
+  console.error("Error loading questions.json", err);
 }
 
-const games = {}; 
+const rooms = {};
 
-function generateCode() {
+function generatePin() {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
 io.on('connection', (socket) => {
-  socket.on('create_game', () => {
-    const code = generateCode();
-    games[code] = { hostId: socket.id, players: {}, state: 'LOBBY' };
-    socket.join(code);
-    socket.emit('game_created', { code });
+  socket.on('create-room', () => {
+    const pin = generatePin();
+    rooms[pin] = { hostId: socket.id, players: {} };
+    socket.join(pin);
+    socket.emit('room-created', pin);
   });
 
-  socket.on('join_game', ({ code, nickname }) => {
-    const game = games[code];
-    if (!game) return socket.emit('join_error', 'Game code not found.');
-    if (game.state !== 'LOBBY') return socket.emit('join_error', 'Game already in progress.');
-
-    socket.join(code);
-    game.players[socket.id] = { id: socket.id, name: nickname, score: 0, multiplier: 1 };
-    socket.emit('joined_successfully', { code, nickname });
-    io.to(game.hostId).emit('player_list_update', Object.values(game.players));
-  });
-
-  socket.on('start_game', ({ code }) => {
-    const game = games[code];
-    if (game && game.hostId === socket.id) {
-      game.state = 'PLAYING';
-      io.to(code).emit('game_started', { questions });
-    }
-  });
-
-  socket.on('submit_answer', ({ code, isCorrect }) => {
-    const game = games[code];
-    if (!game || !game.players[socket.id]) return;
-
-    if (isCorrect) {
-      socket.emit('show_chests');
+  socket.on('join-room', ({ pin, nickname }) => {
+    if (rooms[pin]) {
+      rooms[pin].players[socket.id] = { nickname, gold: 0 };
+      socket.join(pin);
+      socket.emit('joined-successfully');
+      io.to(rooms[pin].hostId).emit('update-players', rooms[pin].players);
     } else {
-      socket.emit('answer_result', { correct: false, score: game.players[socket.id].score });
+      socket.emit('error-msg', 'Room not found!');
     }
   });
 
-  socket.on('select_chest', ({ code }) => {
-    const game = games[code];
-    if (!game || !game.players[socket.id]) return;
+  socket.on('request-question', ({ pin }) => {
+    if (questions.length > 0) {
+      const q = questions[Math.floor(Math.random() * questions.length)];
+      socket.emit('receive-question', q);
+    }
+  });
 
-    const player = game.players[socket.id];
-    const otherPlayers = Object.values(game.players).filter(p => p.id !== socket.id);
+  socket.on('submit-answer', ({ pin, isCorrect }) => {
+    socket.emit('answer-result', { isCorrect });
+  });
 
-    const outcomes = [
-      { type: 'gold', value: 100 * player.multiplier, msg: `+${100 * player.multiplier} Gold!` },
-      { type: 'gold', value: 250 * player.multiplier, msg: `+${250 * player.multiplier} Gold!` },
-      { type: 'multiplier', value: 2, msg: '2x Multiplier activated!' },
-      { type: 'steal', value: 150, msg: 'Stole 150 Gold!' }
-    ];
+  socket.on('open-chest', ({ pin, chestIndex }) => {
+    const room = rooms[pin];
+    if (!room) return;
 
+    const player = room.players[socket.id];
+    if (!player) return;
+
+    // Determine random chest outcome
+    const outcomes = ['gold_small', 'gold_med', 'gold_large', 'steal', 'swap', 'lose'];
     const outcome = outcomes[Math.floor(Math.random() * outcomes.length)];
+    let resultMsg = "";
 
-    if (outcome.type === 'gold') {
-      player.score += outcome.value;
-    } else if (outcome.type === 'multiplier') {
-      player.multiplier *= outcome.value;
-    } else if (outcome.type === 'steal') {
-      if (otherPlayers.length > 0) {
-        const victim = otherPlayers[Math.floor(Math.random() * otherPlayers.length)];
-        const stolen = Math.min(victim.score, outcome.value);
-        victim.score -= stolen;
-        player.score += stolen;
+    const otherPlayerIds = Object.keys(room.players).filter(id => id !== socket.id);
+
+    if (outcome === 'gold_small') {
+      player.gold += 50;
+      resultMsg = "+50 Gold!";
+    } else if (outcome === 'gold_med') {
+      player.gold += 150;
+      resultMsg = "+150 Gold!";
+    } else if (outcome === 'gold_large') {
+      player.gold += 300;
+      resultMsg = "+300 Gold!";
+    } else if (outcome === 'steal') {
+      if (otherPlayerIds.length > 0) {
+        // Find player with highest gold
+        let targetId = otherPlayerIds.reduce((maxId, id) => 
+          room.players[id].gold > room.players[maxId].gold ? id : maxId, otherPlayerIds[0]);
+        let stolenAmount = Math.floor(room.players[targetId].gold * 0.25);
+        if (stolenAmount === 0) stolenAmount = 50;
+        
+        room.players[targetId].gold = Math.max(0, room.players[targetId].gold - stolenAmount);
+        player.gold += stolenAmount;
+        resultMsg = `Stole ${stolenAmount} Gold from ${room.players[targetId].nickname}!`;
       } else {
-        player.score += 50;
-        outcome.msg = '+50 Gold (No players to steal from)';
+        player.gold += 100;
+        resultMsg = "+100 Gold!";
       }
+    } else if (outcome === 'swap') {
+      if (otherPlayerIds.length > 0) {
+        let randomTargetId = otherPlayerIds[Math.floor(Math.random() * otherPlayerIds.length)];
+        let temp = player.gold;
+        player.gold = room.players[randomTargetId].gold;
+        room.players[randomTargetId].gold = temp;
+        resultMsg = `Swapped Gold with ${room.players[randomTargetId].nickname}!`;
+      } else {
+        player.gold += 100;
+        resultMsg = "+100 Gold!";
+      }
+    } else if (outcome === 'lose') {
+      let lost = Math.floor(player.gold * 0.25);
+      player.gold -= lost;
+      resultMsg = `Lose 25% Gold (-${lost})!`;
     }
 
-    socket.emit('chest_opened', { outcome: outcome.msg, newScore: player.score });
-    io.to(code).emit('leaderboard_update', Object.values(game.players).sort((a, b) => b.score - a.score));
-  });
-
-  socket.on('disconnect', () => {
-    for (const code in games) {
-      const game = games[code];
-      if (game.players[socket.id]) {
-        delete game.players[socket.id];
-        io.to(game.hostId).emit('player_list_update', Object.values(game.players));
-        io.to(code).emit('leaderboard_update', Object.values(game.players).sort((a, b) => b.score - a.score));
-      }
-    }
+    socket.emit('chest-opened', { resultMsg, totalGold: player.gold });
+    io.to(room.hostId).emit('update-players', room.players);
   });
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Server live on port ${PORT}`));
+server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
