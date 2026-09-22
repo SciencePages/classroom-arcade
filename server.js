@@ -10,7 +10,7 @@ const io = new Server(server);
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Default fallback questions in case file loading is interrupted
+// 10 Embedded Questions (Ensures immediate, fault-tolerant loading)
 let questions = [
   {
     question: "What process do plants use to convert sunlight into energy?",
@@ -21,10 +21,50 @@ let questions = [
     question: "Which planet in our solar system is known as the Red Planet?",
     options: ["Venus", "Mars", "Jupiter", "Saturn"],
     answer: "Mars"
+  },
+  {
+    question: "What is the hardest naturally occurring substance on Earth?",
+    options: ["Gold", "Iron", "Diamond", "Quartz"],
+    answer: "Diamond"
+  },
+  {
+    question: "What force keeps objects grounded on Earth?",
+    options: ["Magnetism", "Friction", "Gravity", "Inertia"],
+    answer: "Gravity"
+  },
+  {
+    question: "Which gas do humans require to breathe for survival?",
+    options: ["Carbon Dioxide", "Oxygen", "Nitrogen", "Helium"],
+    answer: "Oxygen"
+  },
+  {
+    question: "How many continents are there on Earth?",
+    options: ["5", "6", "7", "8"],
+    answer: "7"
+  },
+  {
+    question: "What state of matter is water vapor?",
+    options: ["Solid", "Liquid", "Gas", "Plasma"],
+    answer: "Gas"
+  },
+  {
+    question: "What organ pumps blood throughout the human body?",
+    options: ["Brain", "Lungs", "Liver", "Heart"],
+    answer: "Heart"
+  },
+  {
+    question: "Which chemical element has the symbol 'O'?",
+    options: ["Osmium", "Oxygen", "Gold", "Zinc"],
+    answer: "Oxygen"
+  },
+  {
+    question: "What is the freezing point of water in Celsius?",
+    options: ["0°C", "32°C", "100°C", "-10°C"],
+    answer: "0°C"
   }
 ];
 
-// Load questions.json with absolute path resolution
+// Load questions.json if present
 try {
   const qPath = path.join(__dirname, 'questions.json');
   if (fs.existsSync(qPath)) {
@@ -32,11 +72,10 @@ try {
     const parsed = JSON.parse(fileData);
     if (Array.isArray(parsed) && parsed.length > 0) {
       questions = parsed;
-      console.log(`Loaded ${questions.length} questions successfully.`);
     }
   }
 } catch (err) {
-  console.error("Error loading questions.json, using fallback bank:", err);
+  console.log("Using default question bank.");
 }
 
 const rooms = {};
@@ -48,7 +87,7 @@ function generatePin() {
 io.on('connection', (socket) => {
   socket.on('create-room', () => {
     const pin = generatePin();
-    rooms[pin] = { hostId: socket.id, players: {}, state: 'lobby' };
+    rooms[pin] = { hostId: socket.id, players: {} };
     socket.join(pin);
     socket.emit('room-created', pin);
   });
@@ -67,15 +106,11 @@ io.on('connection', (socket) => {
 
   socket.on('start-game', ({ pin }) => {
     const cleanPin = pin ? pin.toString().trim() : '';
-    if (rooms[cleanPin] && rooms[cleanPin].hostId === socket.id) {
-      rooms[cleanPin].state = 'playing';
-      io.to(cleanPin).emit('game-started');
-    }
+    io.to(cleanPin).emit('game-started');
   });
 
-  socket.on('request-question', ({ pin }) => {
-    const cleanPin = pin ? pin.toString().trim() : '';
-    if (rooms[cleanPin] && rooms[cleanPin].state === 'playing' && questions.length > 0) {
+  socket.on('request-question', () => {
+    if (questions.length > 0) {
       const q = questions[Math.floor(Math.random() * questions.length)];
       socket.emit('receive-question', q);
     }
@@ -88,7 +123,7 @@ io.on('connection', (socket) => {
   socket.on('open-chest', ({ pin, chestIndex }) => {
     const cleanPin = pin ? pin.toString().trim() : '';
     const room = rooms[cleanPin];
-    if (!room || room.state !== 'playing') return;
+    if (!room) return;
 
     const player = room.players[socket.id];
     if (!player) return;
