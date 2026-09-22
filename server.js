@@ -25,7 +25,7 @@ function generatePin() {
 io.on('connection', (socket) => {
   socket.on('create-room', () => {
     const pin = generatePin();
-    rooms[pin] = { hostId: socket.id, players: {} };
+    rooms[pin] = { hostId: socket.id, players: {}, state: 'lobby' };
     socket.join(pin);
     socket.emit('room-created', pin);
   });
@@ -41,8 +41,15 @@ io.on('connection', (socket) => {
     }
   });
 
+  socket.on('start-game', ({ pin }) => {
+    if (rooms[pin] && rooms[pin].hostId === socket.id) {
+      rooms[pin].state = 'playing';
+      io.to(pin).emit('game-started');
+    }
+  });
+
   socket.on('request-question', ({ pin }) => {
-    if (questions.length > 0) {
+    if (rooms[pin] && rooms[pin].state === 'playing' && questions.length > 0) {
       const q = questions[Math.floor(Math.random() * questions.length)];
       socket.emit('receive-question', q);
     }
@@ -54,12 +61,11 @@ io.on('connection', (socket) => {
 
   socket.on('open-chest', ({ pin, chestIndex }) => {
     const room = rooms[pin];
-    if (!room) return;
+    if (!room || room.state !== 'playing') return;
 
     const player = room.players[socket.id];
     if (!player) return;
 
-    // Determine random chest outcome
     const outcomes = ['gold_small', 'gold_med', 'gold_large', 'steal', 'swap', 'lose'];
     const outcome = outcomes[Math.floor(Math.random() * outcomes.length)];
     let resultMsg = "";
@@ -77,7 +83,6 @@ io.on('connection', (socket) => {
       resultMsg = "+300 Gold!";
     } else if (outcome === 'steal') {
       if (otherPlayerIds.length > 0) {
-        // Find player with highest gold
         let targetId = otherPlayerIds.reduce((maxId, id) => 
           room.players[id].gold > room.players[maxId].gold ? id : maxId, otherPlayerIds[0]);
         let stolenAmount = Math.floor(room.players[targetId].gold * 0.25);
