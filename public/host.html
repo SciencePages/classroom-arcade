@@ -15,7 +15,9 @@
       <h1 id="game-pin" style="font-size: 52px; color: #52b788; letter-spacing: 6px; margin: 10px 0;">------</h1>
     </div>
 
-    <h2 style="border-bottom: 2px solid #3d405b; padding-bottom: 10px;">Live Leaderboard</h2>
+    <button id="start-btn" onclick="startGame()" style="background: #2a9d8f; font-size: 20px; display: none; margin-bottom: 20px;">▶ Start Game</button>
+
+    <h2 style="border-bottom: 2px solid #3d405b; padding-bottom: 10px;">Joined Players</h2>
     <div id="player-list" style="text-align: left; margin-top: 15px;">
       <p style="color: #888; text-align: center;">No players joined yet...</p>
     </div>
@@ -24,20 +26,31 @@
   <script src="/socket.io/socket.io.js"></script>
   <script>
     const socket = io();
+    let currentPin = '';
 
     function createRoom() {
       socket.emit('create-room');
     }
 
     socket.on('room-created', (pin) => {
+      currentPin = pin;
       document.getElementById('game-pin').innerText = pin;
+      document.getElementById('start-btn').style.display = 'block';
     });
+
+    function startGame() {
+      if (currentPin) {
+        socket.emit('start-game', { pin: currentPin });
+        document.getElementById('start-btn').innerText = 'Game in Progress...';
+        document.getElementById('start-btn').disabled = true;
+        document.getElementById('start-btn').style.background = '#4a4e69';
+      }
+    }
 
     socket.on('update-players', (players) => {
       const list = document.getElementById('player-list');
       list.innerHTML = '';
       
-      // Sort players by gold descending
       const sorted = Object.values(players).sort((a, b) => b.gold - a.gold);
 
       if (sorted.length === 0) {
