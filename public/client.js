@@ -26,7 +26,7 @@ socket.on('error-msg', (msg) => alert(msg));
 function loadNextQuestion() {
   document.getElementById('chest-overlay').style.display = 'none';
   document.getElementById('chest-selection').style.display = 'block';
-  document.getElementById('steal-picker').style.display = 'none';
+  document.getElementById('target-picker').style.display = 'none';
   document.getElementById('question-card').style.display = 'block';
   
   const resultBox = document.getElementById('chest-result');
@@ -66,18 +66,27 @@ function pickChest(index) {
   socket.emit('open-chest', { chestIndex: index });
 }
 
-socket.on('prompt-steal', ({ targets }) => {
+socket.on('prompt-target', ({ actionType, targets }) => {
   document.getElementById('chest-selection').style.display = 'none';
-  const picker = document.getElementById('steal-picker');
+  const picker = document.getElementById('target-picker');
+  const title = document.getElementById('picker-title');
   const targetList = document.getElementById('target-list');
   targetList.innerHTML = '';
 
+  if (actionType === 'steal') {
+    title.innerText = '😈 Choose who to STEAL gold from:';
+    title.style.color = '#e0aaff';
+  } else {
+    title.innerText = '🔄 Choose who to SWAP gold with:';
+    title.style.color = '#f4a261';
+  }
+
   targets.forEach(t => {
     const btn = document.createElement('button');
-    btn.style.cssText = 'background: #3c096c; border: 2px solid #9d4edd; color: #fff; margin: 6px 0; font-size: 18px; width: 100%;';
-    btn.innerText = `😈 Steal from ${t.nickname} (${t.gold} Gold)`;
+    btn.style.cssText = 'background: #3c096c; border: 2px solid #9d4edd; color: #fff; margin: 6px 0; font-size: 18px; width: 100%; cursor: pointer; padding: 10px; border-radius: 8px;';
+    btn.innerText = `${t.nickname} (${t.gold} Gold)`;
     btn.onclick = () => {
-      socket.emit('execute-steal', { targetId: t.id });
+      socket.emit('execute-target-action', { actionType, targetId: t.id });
       picker.style.display = 'none';
     };
     targetList.appendChild(btn);
@@ -88,7 +97,7 @@ socket.on('prompt-steal', ({ targets }) => {
 
 socket.on('chest-opened', ({ resultMsg, totalGold }) => {
   document.getElementById('chest-selection').style.display = 'none';
-  document.getElementById('steal-picker').style.display = 'none';
+  document.getElementById('target-picker').style.display = 'none';
   document.getElementById('gold-count').innerText = totalGold;
   
   const resultBox = document.getElementById('chest-result');
