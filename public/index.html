@@ -28,12 +28,21 @@
     </div>
 
     <div id="chest-overlay" style="display:none;">
-      <h2>Correct! Pick a Mystery Chest:</h2>
-      <div class="chest-container">
-        <button class="chest-btn" onclick="pickChest(0)">🧰 Chest 1</button>
-        <button class="chest-btn" onclick="pickChest(1)">🧰 Chest 2</button>
-        <button class="chest-btn" onclick="pickChest(2)">🧰 Chest 3</button>
+      <div id="chest-selection">
+        <h2>Correct! Pick a Mystery Chest:</h2>
+        <div class="chest-container">
+          <button class="chest-btn" onclick="pickChest(0)">🧰 Chest 1</button>
+          <button class="chest-btn" onclick="pickChest(1)">🧰 Chest 2</button>
+          <button class="chest-btn" onclick="pickChest(2)">🧰 Chest 3</button>
+        </div>
       </div>
+
+      <!-- Interactive Steal Target Selector -->
+      <div id="steal-picker" style="display:none;">
+        <h2 style="color: #e0aaff;">Choose who to steal from:</h2>
+        <div id="target-list" style="margin: 15px 0;"></div>
+      </div>
+
       <h3 id="chest-result"></h3>
       <button id="next-q-btn" style="display:none;" onclick="loadNextQuestion()">Next Question</button>
     </div>
